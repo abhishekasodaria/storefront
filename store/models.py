@@ -1,3 +1,4 @@
+from django.core.validators import MinValueValidator
 from django.db import models
 
 
@@ -10,16 +11,30 @@ class Collection(models.Model):
     title = models.CharField(max_length=255)
     featured_product = models.ForeignKey('Products', on_delete=models.SET_NULL, null=True, related_name='+')
 
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        ordering = ['title']
+
 
 class Products(models.Model):
     title = models.CharField(max_length=255, null=True, blank=True)
     slug = models.SlugField()
     description = models.TextField()
-    unit_price = models.DecimalField(max_digits=6, decimal_places=2)
-    inventory = models.IntegerField()
+    unit_price = models.DecimalField(max_digits=6,
+                                     decimal_places=2,
+                                     validators=[MinValueValidator(1)])
+    inventory = models.IntegerField(validators=[MinValueValidator(0)])
     last_update = models.DateTimeField(auto_now=True)
     collection = models.ForeignKey(Collection, on_delete=models.PROTECT)
-    promotion = models.ManyToManyField(Promotion)
+    promotion = models.ManyToManyField(Promotion, blank=True)
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        ordering = ['title']
 
 
 class Customer(models.Model):
@@ -37,6 +52,12 @@ class Customer(models.Model):
     phone = models.CharField(max_length=255)
     birth_date = models.DateField(null=True)
     membership_choices = models.CharField(max_length=1, choices=MEMBERSHIP_CHOICES, default=MEMBERSHIP_BRONZE)
+
+    class Meta:
+        ordering = ['first_name']
+
+    def __str__(self):
+        return self.first_name
 
 
 class Order(models.Model):
