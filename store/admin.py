@@ -2,8 +2,6 @@ from django.contrib import admin
 from django.urls import reverse
 from django.db.models import Count
 from django.contrib import messages
-from django.contrib.contenttypes.admin import GenericTabularInline
-from tags.models import TagItem
 from django.utils.html import format_html
 from django.utils.http import urlencode
 
@@ -25,8 +23,6 @@ class InventoryListFilter(admin.SimpleListFilter):
             return queryset.filter(inventory__lt=10)
         elif self.value() == ">10":
             return queryset.filter(inventory__gt=10)
-
-
 
 
 @admin.register(models.Products)

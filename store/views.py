@@ -1,10 +1,65 @@
-from django.shortcuts import render
-from django.db.models import F, Max, Count, Sum
-from .models import *
+from django.db.models import Count
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.viewsets import ModelViewSet, GenericViewSet
+from rest_framework.mixins import (CreateModelMixin, RetrieveModelMixin, DestroyModelMixin, ListModelMixin,
+                                   UpdateModelMixin)
+from rest_framework.response import Response
+from .pagination import DefaultPagination
+from .filters import ProductFilter
+from .serializers import *
 
-def say_hello(request):
 
-    customers = OrderItem.objects.annotate(total_sales=Sum(F('quantity') * F('unit_price'))).\
-        values('products__title').order_by('-total_sales')[:5]
+class ProductViewSet(ModelViewSet):
+    queryset = Products.objects.select_related('collection').all()
+    serializer_class = ProductSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = ProductFilter
+    pagination_class = DefaultPagination
+    search_fields = ['collection__title']
 
-    return render(request, "hello.html", {"customers":customers})
+    def destroy(self, request, *args, **kwargs):
+        if OrderItem.objects.filter(products_id=kwargs['pk']).count() > 0:
+            return Response({'errors': 'Product with this id cannot be deleted because it is associated with an order \
+                                        item'})
+        return super().destroy(request, *args, **kwargs)
+
+
+class CollectionViewSet(ModelViewSet):
+    queryset = Collection.objects.annotate(products_count=Count('products')).all()
+    serializer_class = CollectionSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        if Products.objects.filter(collection_id=kwargs['pk']).count() > 0:
+            return Response({'error': 'Collection with this id cannot be deleted as its has '
+                                      'products associated with it'})
+        return super().destroy(request, *args, **kwargs)
+
+
+class ReviewViewSet(ModelViewSet):
+    serializer_class = ReviewSerializer
+
+    def get_queryset(self):
+        return Review.objects.filter(product_id=self.kwargs['product_pk'])
+
+
+class CartViewSet(CreateModelMixin,
+                  RetrieveModelMixin,
+                  DestroyModelMixin,
+                  GenericViewSet):
+    queryset = Cart.objects.all()
+    serializer_class = CartSerializer
+
+
+class CartItemViewSet(ModelViewSet):
+    http_method_names = ['post', 'get', 'patch', 'delete']
+
+    def get_queryset(self):
+        return CartItem.objects.select_related('products').filter(cart_id=self.kwargs['cart_pk'])
+
+    def get_serializer_class(self):
+        if self.action in ['create']:
+            return AddCartItemSerializer
+        if self.action in ['partial_update']:
+            return UpdateCartItemSerializer
+        return CartItemSerializer
