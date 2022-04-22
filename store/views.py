@@ -74,10 +74,11 @@ class CustomerViewSet(ModelViewSet):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
     permission_classes = [IsAdminOrReadOnly]
+    http_method_names = ['get', 'put', 'patch', 'delete']
 
     @action(detail=True, methods=['GET', 'PUT'], permission_classes=[IsAuthenticated])
     def me(self, request):
-        customer, created = Customer.objects.get_or_create(user_id=self.request.user.id)
+        customer = Customer.objects.get(user_id=self.request.user.id)
         if request.method == "PUT":
             serializer = CustomerSerializer(customer, data=request.data)
             serializer.is_valid(raise_exception=True)
@@ -86,3 +87,26 @@ class CustomerViewSet(ModelViewSet):
         else:
             serializer = CustomerSerializer(customer)
             return Response(serializer.data)
+
+
+class OrderViewSet(ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'patch', 'delete']
+
+    def get_permissions(self):
+        if self.action in ['partial_update']:
+            return [IsAdminOrReadOnly()]
+
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return Order.objects.all()
+        return Order.objects.filter(customer__user_id=self.request.user.id)
+
+    def get_serializer_class(self):
+        if self.action in ['partial_update']:
+            return UpdateOrderSerializer
+        if self.action in ['create']:
+            return CreateOrderSerializer
+        return OrderSerializer
